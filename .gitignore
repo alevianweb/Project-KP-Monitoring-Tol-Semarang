@@ -1,0 +1,24 @@
+# Folder environment Python
+ai_engine/venv/
+__pycache__/
+
+# Dependencies web/PHP (Laravel/React/Vue dsb)
+webgis-tol-semarang/vendor/
+webgis-tol-semarang/node_modules/
+
+# File model AI (ukurannya terlalu besar untuk GitHub)
+*.pt
+ai_engine/*.pt
+models/
+
+# Datasets yang sangat besar
+datasets/
+
+# Konfigurasi / Secret keys
+*.env
+ai_engine/.env
+webgis-tol-semarang/.env
+
+# Log & Output
+ai_engine/logs/
+ai_engine/outputs/
