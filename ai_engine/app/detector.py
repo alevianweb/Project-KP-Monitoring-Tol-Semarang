@@ -3,8 +3,19 @@ import supervision as sv
 
 class VehicleDetector:
 
-    def __init__(self, model_path="yolo11s.pt"):
+    def __init__(self, model_path="yolo11n.pt"):
+        import torch
         self.model = YOLO(model_path)
+        
+        if torch.cuda.is_available():
+            self.model.to('cuda:0')
+            device_used = 'CUDA'
+        else:
+            device_used = 'CPU'
+            
+        print(f"\n==============================================")
+        print(f"🚀 [INFO] YOLO Model berjalan di: {device_used}")
+        print(f"==============================================\n")
 
     def detect(self, frame):
 

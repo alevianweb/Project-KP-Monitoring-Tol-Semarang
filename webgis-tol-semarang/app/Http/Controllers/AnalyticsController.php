@@ -84,9 +84,17 @@ class AnalyticsController extends Controller
         // --- 3. CHART DATA ---
         // Daily Chart (Last 15 Days)
         $dailyChartData = (clone $dailyQuery)
-            ->orderBy('statistic_date', 'asc')
+            ->select('statistic_date', 
+                DB::raw('SUM(car) as car'),
+                DB::raw('SUM(motorcycle) as motorcycle'),
+                DB::raw('SUM(bus) as bus'),
+                DB::raw('SUM(truck) as truck')
+            )
+            ->groupBy('statistic_date')
+            ->orderBy('statistic_date', 'desc')
             ->limit(15)
-            ->get();
+            ->get()
+            ->reverse();
 
         $dailyLabels = [];
         $dailyCars = [];
@@ -103,10 +111,18 @@ class AnalyticsController extends Controller
 
         // Weekly Chart (Last 8 Weeks)
         $weeklyChartData = (clone $weeklyQuery)
-            ->orderBy('year', 'asc')
-            ->orderBy('week', 'asc')
+            ->select('year', 'week',
+                DB::raw('SUM(car) as car'),
+                DB::raw('SUM(motorcycle) as motorcycle'),
+                DB::raw('SUM(bus) as bus'),
+                DB::raw('SUM(truck) as truck')
+            )
+            ->groupBy('year', 'week')
+            ->orderBy('year', 'desc')
+            ->orderBy('week', 'desc')
             ->limit(8)
-            ->get();
+            ->get()
+            ->reverse();
 
         $weeklyLabels = [];
         $weeklyCars = [];
@@ -124,6 +140,13 @@ class AnalyticsController extends Controller
         // Monthly Chart (All Months in Current Year)
         $monthlyChartData = (clone $monthlyQuery)
             ->where('year', $currentYear)
+            ->select('month',
+                DB::raw('SUM(car) as car'),
+                DB::raw('SUM(motorcycle) as motorcycle'),
+                DB::raw('SUM(bus) as bus'),
+                DB::raw('SUM(truck) as truck')
+            )
+            ->groupBy('month')
             ->orderBy('month', 'asc')
             ->get();
 

@@ -20,7 +20,6 @@ latest_frames = {}
 running = True
 
 # Preload detector to avoid startup latency
-# Preload detector to avoid startup latency
 print("Loading YOLO Model...")
 detector = VehicleDetector()
 detector_lock = threading.Lock()
@@ -75,7 +74,19 @@ def process_camera_loop(cam):
     line_color = (0, 0, 255)
     
     print(f"Started AI engine for Camera {cam['name']}...")
+    
+    # Hitung delay ideal antar frame (misal 33ms untuk 30 FPS)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps == 0 or fps > 120 or fps < 1:
+        fps = 30.0
+    delay = 1.0 / fps
+    
+    is_stream = str(video_path).startswith("rtsp://") or str(video_path).startswith("http://")
+    
     try:
+        frame_count = 0
+        next_frame_time = time.perf_counter()
+        
         while running:
             if not cap.isOpened():
                 time.sleep(1)
@@ -86,6 +97,15 @@ def process_camera_loop(cam):
             if not ret:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
+            
+            # KITA HAPUS FRAME SKIPPING (Dulu ada if frame_count % 3 != 0)
+            # Karena pakai GPU CUDA, AI mampu memproses SETIAP frame tanpa dilewati!
+            # Ini sangat penting agar tracking dan counting tidak terputus (mobil teleport).
+            frame_count += 1
+            
+            # KEMBALI KE RESOLUSI AWAL ANDA: 800x450
+            # 640x360 membuat mobil terlalu kecil sehingga kotak sering hilang. 800x450 adalah sweet spot Anda.
+            frame = cv2.resize(frame, (800, 450))
                 
             h, w = frame.shape[:2]
             scale_x = w / 1920.0
@@ -104,9 +124,9 @@ def process_camera_loop(cam):
             tracked = tracker.update(detections)
             counter.update(tracked, results.names)
             
-            cv2.line(frame, counter.line_start, counter.line_end, line_color, 3)
-            cv2.putText(frame, "GARIS BATAS DETEKSI", (counter.line_start[0] + 10, counter.line_start[1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, line_color, 2)
+            cv2.line(frame, counter.line_start, counter.line_end, line_color, 2)
+            cv2.putText(frame, "GARIS BATAS DETEKSI", (counter.line_start[0] + 5, counter.line_start[1] - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, line_color, 1)
             
             if tracked.tracker_id is not None:
                 for i in range(len(tracked.xyxy)):
@@ -115,30 +135,39 @@ def process_camera_loop(cam):
                     class_id = int(tracked.class_id[i])
                     class_name = results.names[class_id]
                     
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, f"{class_name} #{track_id}", (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
+                    cv2.putText(frame, f"{class_name} #{track_id}", (x1, y1 - 5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
-            overlay_x = 20
-            overlay_y = 45
-            cv2.rectangle(frame, (overlay_x - 10, overlay_y - 25), (overlay_x + 240, overlay_y + 110), (0, 0, 0), -1)
+            overlay_x = 15
+            overlay_y = 30
+            cv2.rectangle(frame, (overlay_x - 5, overlay_y - 20), (overlay_x + 160, overlay_y + 85), (0, 0, 0), -1)
             
             cv2.putText(frame, f"CCTV: {cam['name']}", (overlay_x, overlay_y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            cv2.putText(frame, f"Total Hitung: {counter.total}", (overlay_x, overlay_y + 25),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-            cv2.putText(frame, f"Mobil: {counter.counts['car']}", (overlay_x, overlay_y + 45),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-            cv2.putText(frame, f"Motor: {counter.counts['motorcycle']}", (overlay_x, overlay_y + 65),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-            cv2.putText(frame, f"Bus/Truk: {counter.counts['bus'] + counter.counts['truck']}", (overlay_x, overlay_y + 85),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+            cv2.putText(frame, f"Total Hitung: {counter.total}", (overlay_x, overlay_y + 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            cv2.putText(frame, f"Mobil: {counter.counts.get('car', 0)}", (overlay_x, overlay_y + 35),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+            cv2.putText(frame, f"Motor: {counter.counts.get('motorcycle', 0)}", (overlay_x, overlay_y + 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+            cv2.putText(frame, f"Bus/Truk: {counter.counts.get('bus', 0) + counter.counts.get('truck', 0)}", (overlay_x, overlay_y + 65),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
 
-            ret_enc, buffer = cv2.imencode('.jpg', frame)
+            # Kompresi JPEG: kualitas 80 agar ukuran file sangat kecil tapi jernih
+            ret_enc, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             if ret_enc:
                 latest_frames[cam['id']] = buffer.tobytes()
             
-            time.sleep(0.03) # Prevent CPU starvation
+            # Pacing presisi tinggi untuk file video lokal agar 100% mulus (mengatasi limitasi time.sleep di Windows)
+            if not is_stream:
+                next_frame_time += delay
+                sleep_time = next_frame_time - time.perf_counter()
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                else:
+                    next_frame_time = time.perf_counter() # Reset jika tertinggal
+                    
     except Exception as e:
         print(f"Error in processing loop for {cam['name']}: {e}")
     finally:
@@ -153,6 +182,7 @@ async def lifespan(app: FastAPI):
     cameras = get_all_cameras()
     threads = []
     for cam in cameras:
+        # KEMBALI MENGGUNAKAN SINGLE THREAD SEPERTI AWAL
         t = threading.Thread(target=process_camera_loop, args=(cam,), daemon=True)
         t.start()
         threads.append(t)
@@ -166,14 +196,21 @@ app = FastAPI(title="Semarang Toll Gate Vehicle Monitoring AI Engine", lifespan=
 
 @app.get("/stream/{camera_id}")
 async def stream_camera(camera_id: int):
-    # Endpoint now just reads from the latest_frames buffer
-    def generate_frames():
+    # Gunakan Async Generator agar WebGIS menerima frame secepat kilat
+    async def generate_frames():
+        last_frame = None
         while running:
             if camera_id in latest_frames:
                 jpeg_bytes = latest_frames[camera_id]
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg_bytes + b'\r\n')
-            time.sleep(0.05) # Cap broadcast to ~20 FPS
+                
+                if jpeg_bytes != last_frame:
+                    last_frame = jpeg_bytes
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + jpeg_bytes + b'\r\n')
+                else:
+                    await asyncio.sleep(0.005) # Async sleep sangat ringan
+            else:
+                await asyncio.sleep(0.01)
 
     return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 
