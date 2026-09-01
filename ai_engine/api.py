@@ -12,9 +12,12 @@ from app.config import FALLBACK_VIDEO
 from app.detector import VehicleDetector
 from app.tracker import VehicleTracker
 from app.counter import VehicleCounter
+from fastapi.middleware.cors import CORSMiddleware
 
 # Global dictionary to store the latest JPEG frame per camera ID
 latest_frames = {}
+camera_status = {} # Store the timestamp of the latest frame per camera
+camera_density = {} # Store the current number of vehicles on screen
 
 # Global flag to stop threads on shutdown
 running = True
@@ -87,6 +90,9 @@ def process_camera_loop(cam):
         frame_count = 0
         next_frame_time = time.perf_counter()
         
+        last_tracked = None
+        last_results = None
+        
         while running:
             if not cap.isOpened():
                 time.sleep(1)
@@ -98,13 +104,10 @@ def process_camera_loop(cam):
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
             
-            # KITA HAPUS FRAME SKIPPING (Dulu ada if frame_count % 3 != 0)
-            # Karena pakai GPU CUDA, AI mampu memproses SETIAP frame tanpa dilewati!
-            # Ini sangat penting agar tracking dan counting tidak terputus (mobil teleport).
+            # SMART FRAME SKIPPING: Baca semua frame agar video mulus, 
+            # tapi jalankan YOLO AI hanya setiap 2 frame untuk meringankan GPU.
             frame_count += 1
             
-            # KEMBALI KE RESOLUSI AWAL ANDA: 800x450
-            # 640x360 membuat mobil terlalu kecil sehingga kotak sering hilang. 800x450 adalah sweet spot Anda.
             frame = cv2.resize(frame, (800, 450))
                 
             h, w = frame.shape[:2]
@@ -119,16 +122,26 @@ def process_camera_loop(cam):
             counter.line_start = (ls_x, ls_y)
             counter.line_end = (le_x, le_y)
 
-            with detector_lock:
-                detections, results = detector.detect(frame)
-            tracked = tracker.update(detections)
-            counter.update(tracked, results.names)
+            # Jalankan deteksi YOLO hanya di frame ganjil atau jika belum ada data
+            if frame_count % 2 != 0 or last_tracked is None:
+                with detector_lock:
+                    detections, results = detector.detect(frame)
+                tracked = tracker.update(detections)
+                counter.update(tracked, results.names)
+                
+                last_tracked = tracked
+                last_results = results
+            else:
+                # Gunakan hasil deteksi sebelumnya untuk frame genap
+                tracked = last_tracked
+                results = last_results
             
             cv2.line(frame, counter.line_start, counter.line_end, line_color, 2)
             cv2.putText(frame, "GARIS BATAS DETEKSI", (counter.line_start[0] + 5, counter.line_start[1] - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, line_color, 1)
             
             if tracked.tracker_id is not None:
+                camera_density[cam['id']] = len(tracked.xyxy)
                 for i in range(len(tracked.xyxy)):
                     x1, y1, x2, y2 = tracked.xyxy[i].astype(int)
                     track_id = int(tracked.tracker_id[i])
@@ -138,6 +151,9 @@ def process_camera_loop(cam):
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
                     cv2.putText(frame, f"{class_name} #{track_id}", (x1, y1 - 5),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+
+            else:
+                camera_density[cam['id']] = 0
 
             overlay_x = 15
             overlay_y = 30
@@ -158,6 +174,7 @@ def process_camera_loop(cam):
             ret_enc, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             if ret_enc:
                 latest_frames[cam['id']] = buffer.tobytes()
+                camera_status[cam['id']] = time.time()
             
             # Pacing presisi tinggi untuk file video lokal agar 100% mulus (mengatasi limitasi time.sleep di Windows)
             if not is_stream:
@@ -194,6 +211,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Semarang Toll Gate Vehicle Monitoring AI Engine", lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/stream/{camera_id}")
 async def stream_camera(camera_id: int):
     # Gunakan Async Generator agar WebGIS menerima frame secepat kilat
@@ -217,3 +242,15 @@ async def stream_camera(camera_id: int):
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "vehicle_monitoring_ai_engine"}
+
+@app.get("/status")
+def get_status():
+    current_time = time.time()
+    status = {}
+    for cam_id, last_time in camera_status.items():
+        is_online = (current_time - last_time < 5.0)
+        status[cam_id] = {
+            "status": "online" if is_online else "offline",
+            "vehicles": camera_density.get(cam_id, 0) if is_online else 0
+        }
+    return status

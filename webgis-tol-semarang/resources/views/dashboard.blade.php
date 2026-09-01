@@ -75,10 +75,25 @@
         gap: 0.25rem;
     }
 
-    .status-active {
+    .status-lancar {
         background: rgba(16, 185, 129, 0.15);
-        color: var(--accent-green);
+        color: var(--accent-green, #10b981);
         border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .status-padat {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--accent-yellow, #f59e0b);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+    .status-macet {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--accent-red, #ef4444);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .status-offline {
+        background: rgba(156, 163, 175, 0.15);
+        color: var(--text-secondary, #9ca3af);
+        border: 1px solid rgba(156, 163, 175, 0.2);
     }
 
     .camera-loc {
@@ -199,30 +214,41 @@
         background: rgba(255, 255, 255, 0.2);
     }
 
-    /* Pulsing Dot indicator */
-    .pulse-dot {
-        width: 6px;
-        height: 6px;
-        background-color: var(--accent-green);
-        border-radius: 50%;
-        display: inline-block;
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-        animation: pulse 1.6s infinite;
+    /* Dynamic pulsing dots */
+    .pulse-dot-green {
+        width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+        background-color: var(--accent-green, #10b981);
+        animation: pulse-green 1.6s infinite;
+    }
+    .pulse-dot-yellow {
+        width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+        background-color: var(--accent-yellow, #f59e0b);
+        animation: pulse-yellow 1.2s infinite;
+    }
+    .pulse-dot-red {
+        width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+        background-color: var(--accent-red, #ef4444);
+        animation: pulse-red 0.8s infinite;
+    }
+    .pulse-dot-offline {
+        width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+        background-color: var(--text-secondary, #9ca3af);
     }
 
-    @keyframes pulse {
-        0% {
-            transform: scale(0.95);
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-        }
-        70% {
-            transform: scale(1);
-            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
-        }
-        100% {
-            transform: scale(0.95);
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-        }
+    @keyframes pulse-green {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    @keyframes pulse-yellow {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+    @keyframes pulse-red {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8); }
+        70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
     }
 
     /* Zoom Button & Modal Styles */
@@ -306,8 +332,8 @@
                 <div class="camera-item" id="cam-item-{{ $camera->id }}" onclick="focusCamera({{ $camera->id }}, {{ $camera->latitude }}, {{ $camera->longitude }})">
                     <div class="camera-item-header">
                         <span class="camera-name">{{ $camera->name }}</span>
-                        <span class="status-badge status-active">
-                            <span class="pulse-dot"></span> Online
+                        <span class="status-badge status-offline" id="cam-status-{{ $camera->id }}">
+                            <span class="pulse-dot-offline"></span> Offline
                         </span>
                     </div>
                     <span class="camera-loc">
@@ -343,24 +369,33 @@
 
     // Determine initial theme for tiles
     const initialTheme = localStorage.getItem('theme') === 'light' ? 'light' : 'dark';
-    const tileUrl = initialTheme === 'light' 
-        ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     // Premium Tile Layer
     let tileLayer = L.tileLayer(tileUrl, {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        subdomains: 'abcd',
-        maxZoom: 20
+        maxZoom: 19
     }).addTo(map);
+
+    // Function to apply dark mode filter to map tiles
+    function applyMapTheme(isLight) {
+        const tilePane = document.querySelector('.leaflet-tile-pane');
+        if (tilePane) {
+            if (isLight) {
+                tilePane.style.filter = 'none';
+            } else {
+                tilePane.style.filter = 'brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7)';
+            }
+        }
+    }
+
+    // Apply initial theme
+    setTimeout(() => applyMapTheme(initialTheme === 'light'), 100);
 
     // Listen to theme changes to swap tiles
     window.addEventListener('themeChanged', () => {
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-        const newUrl = isLight 
-            ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-            : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-        tileLayer.setUrl(newUrl);
+        applyMapTheme(isLight);
     });
 
     // Add zoom control at bottom right
@@ -407,7 +442,7 @@
             <div class="popup-content">
                 <div class="popup-title">
                     <span>${cam.name}</span>
-                    <span class="status-badge status-active"><span class="pulse-dot"></span> Live</span>
+                    <span class="status-badge status-offline" id="popup-status-${cam.id}"><span class="pulse-dot-offline"></span> Offline</span>
                 </div>
                 <div class="popup-loc" style="font-size: 0.75rem; color: #9ca3af; margin-bottom: 4px;">
                     <i class="fa-solid fa-location-dot"></i> ${cam.location}
@@ -470,5 +505,60 @@
         document.getElementById('zoomModal').style.display = 'none';
         document.getElementById('zoomedVideo').src = '';
     }
+
+    // Function to check camera status
+    function checkCameraStatus() {
+        fetch('http://localhost:8001/status')
+            .then(response => response.json())
+            .then(data => {
+                camerasData.forEach(cam => {
+                    const status = data[cam.id] || 'offline';
+                    updateCameraUI(cam.id, status);
+                });
+            })
+            .catch(error => {
+                // If API is down, all offline
+                camerasData.forEach(cam => {
+                    updateCameraUI(cam.id, 'offline');
+                });
+            });
+    }
+
+    function updateCameraUI(camId, statusData) {
+        let badgeClass = 'status-offline';
+        let badgeHtml = '<span class="pulse-dot-offline"></span> Offline';
+        
+        let statusString = (typeof statusData === 'object') ? statusData.status : statusData;
+        let vehiclesCount = (typeof statusData === 'object') ? statusData.vehicles : 0;
+
+        if (statusString === 'online') {
+            if (vehiclesCount <= 12) {
+                badgeClass = 'status-lancar';
+                badgeHtml = '<span class="pulse-dot-green"></span> Lancar';
+            } else if (vehiclesCount <= 25) {
+                badgeClass = 'status-padat';
+                badgeHtml = '<span class="pulse-dot-yellow"></span> Padat';
+            } else {
+                badgeClass = 'status-macet';
+                badgeHtml = '<span class="pulse-dot-red"></span> Macet';
+            }
+        }
+        
+        const badge = document.getElementById(`cam-status-${camId}`);
+        if (badge) {
+            badge.className = `status-badge ${badgeClass}`;
+            badge.innerHTML = badgeHtml;
+        }
+        
+        const popupBadge = document.getElementById(`popup-status-${camId}`);
+        if (popupBadge) {
+            popupBadge.className = `status-badge ${badgeClass}`;
+            popupBadge.innerHTML = badgeHtml;
+        }
+    }
+
+    // Check status periodically
+    setInterval(checkCameraStatus, 5000);
+    setTimeout(checkCameraStatus, 1000); // initial check
 </script>
 @endsection

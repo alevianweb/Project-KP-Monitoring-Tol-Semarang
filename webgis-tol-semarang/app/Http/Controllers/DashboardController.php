@@ -14,4 +14,10 @@ class DashboardController extends Controller
         
         return view('dashboard', compact('cameras'));
     }
+
+    public function grid()
+    {
+        $cameras = Camera::where('status', true)->get();
+        return view('grid', compact('cameras'));
+    }
 }

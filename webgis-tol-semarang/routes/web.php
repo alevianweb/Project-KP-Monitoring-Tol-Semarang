@@ -6,4 +6,5 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AnalyticsController;
 
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/grid', [DashboardController::class, 'grid'])->name('grid');
 Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');

@@ -251,6 +251,9 @@
             <a href="{{ route('dashboard') }}" class="navbar-link {{ Route::is('dashboard') ? 'active' : '' }}">
                 <i class="fa-solid fa-map-location-dot"></i> WebGIS CCTV
             </a>
+            <a href="{{ route('grid') }}" class="navbar-link {{ Route::is('grid') ? 'active' : '' }}">
+                <i class="fa-solid fa-desktop"></i> Command Center
+            </a>
             <a href="{{ route('analytics') }}" class="navbar-link {{ Route::is('analytics') ? 'active' : '' }}">
                 <i class="fa-solid fa-chart-line"></i> Dashboard Analisis
             </a>

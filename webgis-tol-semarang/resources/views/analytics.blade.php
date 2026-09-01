@@ -69,6 +69,34 @@
         justify-content: space-between;
         position: relative;
         overflow: hidden;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px) scale(1.02);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        z-index: 2;
+    }
+
+    /* Shine effect */
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 50%;
+        height: 100%;
+        background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+        transform: skewX(-20deg);
+        transition: left 0.6s ease;
+    }
+    
+    [data-theme="light"] .stat-card::after {
+        background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+    }
+
+    .stat-card:hover::after {
+        left: 150%;
     }
 
     .stat-card::before {
@@ -254,7 +282,7 @@
     <div class="stat-card stat-card-total">
         <div class="stat-info">
             <span class="stat-label">Total Kendaraan</span>
-            <span class="stat-value">{{ number_format($totalCount) }}</span>
+            <span class="stat-value count-up" data-target="{{ $totalCount }}">0</span>
         </div>
         <div class="stat-icon icon-total">
             <i class="fa-solid fa-gauge-high"></i>
@@ -263,7 +291,7 @@
     <div class="stat-card stat-card-car">
         <div class="stat-info">
             <span class="stat-label">Mobil Pribadi</span>
-            <span class="stat-value">{{ number_format($carCount) }}</span>
+            <span class="stat-value count-up" data-target="{{ $carCount }}">0</span>
         </div>
         <div class="stat-icon icon-car">
             <i class="fa-solid fa-car"></i>
@@ -272,7 +300,7 @@
     <div class="stat-card stat-card-moto">
         <div class="stat-info">
             <span class="stat-label">Sepeda Motor</span>
-            <span class="stat-value">{{ number_format($motorcycleCount) }}</span>
+            <span class="stat-value count-up" data-target="{{ $motorcycleCount }}">0</span>
         </div>
         <div class="stat-icon icon-moto">
             <i class="fa-solid fa-motorcycle"></i>
@@ -281,7 +309,7 @@
     <div class="stat-card stat-card-bus">
         <div class="stat-info">
             <span class="stat-label">Bus</span>
-            <span class="stat-value">{{ number_format($busCount) }}</span>
+            <span class="stat-value count-up" data-target="{{ $busCount }}">0</span>
         </div>
         <div class="stat-icon icon-bus">
             <i class="fa-solid fa-bus"></i>
@@ -290,7 +318,7 @@
     <div class="stat-card stat-card-truck">
         <div class="stat-info">
             <span class="stat-label">Truk</span>
-            <span class="stat-value">{{ number_format($truckCount) }}</span>
+            <span class="stat-value count-up" data-target="{{ $truckCount }}">0</span>
         </div>
         <div class="stat-icon icon-truck">
             <i class="fa-solid fa-truck"></i>
@@ -314,8 +342,8 @@
         <span class="trend-period">Harian (Hari Ini vs Kemarin)</span>
         <div class="trend-comparison">
             <div class="trend-figures">
-                <span class="trend-current">{{ number_format($todayTotal) }} <span style="font-size:0.75rem; font-weight:normal; color:var(--text-secondary);">kendaraan</span></span>
-                <span class="trend-prev">Kemarin: {{ number_format($yesterdayTotal) }}</span>
+                <span class="trend-current"><span class="count-up" data-target="{{ $todayTotal }}">0</span> <span style="font-size:0.75rem; font-weight:normal; color:var(--text-secondary);">kendaraan</span></span>
+                <span class="trend-prev">Kemarin: <span class="count-up" data-target="{{ $yesterdayTotal }}">0</span></span>
             </div>
             
             @if($dailyGrowth > 0)
@@ -339,8 +367,8 @@
         <span class="trend-period">Mingguan (Minggu Ini vs Minggu Lalu)</span>
         <div class="trend-comparison">
             <div class="trend-figures">
-                <span class="trend-current">{{ number_format($thisWeekTotal) }} <span style="font-size:0.75rem; font-weight:normal; color:var(--text-secondary);">kendaraan</span></span>
-                <span class="trend-prev">Minggu Lalu: {{ number_format($lastWeekTotal) }}</span>
+                <span class="trend-current"><span class="count-up" data-target="{{ $thisWeekTotal }}">0</span> <span style="font-size:0.75rem; font-weight:normal; color:var(--text-secondary);">kendaraan</span></span>
+                <span class="trend-prev">Minggu Lalu: <span class="count-up" data-target="{{ $lastWeekTotal }}">0</span></span>
             </div>
             
             @if($weeklyGrowth > 0)
@@ -364,8 +392,8 @@
         <span class="trend-period">Bulanan (Bulan Ini vs Bulan Lalu)</span>
         <div class="trend-comparison">
             <div class="trend-figures">
-                <span class="trend-current">{{ number_format($thisMonthTotal) }} <span style="font-size:0.75rem; font-weight:normal; color:var(--text-secondary);">kendaraan</span></span>
-                <span class="trend-prev">Bulan Lalu: {{ number_format($lastMonthTotal) }}</span>
+                <span class="trend-current"><span class="count-up" data-target="{{ $thisMonthTotal }}">0</span> <span style="font-size:0.75rem; font-weight:normal; color:var(--text-secondary);">kendaraan</span></span>
+                <span class="trend-prev">Bulan Lalu: <span class="count-up" data-target="{{ $lastMonthTotal }}">0</span></span>
             </div>
             
             @if($monthlyGrowth > 0)
@@ -446,6 +474,34 @@
         Chart.defaults.font.family = "'Outfit', sans-serif";
     }
     updateChartDefaults();
+
+    // --- COUNT UP ANIMATION ---
+    document.addEventListener("DOMContentLoaded", () => {
+        const counters = document.querySelectorAll('.count-up');
+        
+        counters.forEach(counter => {
+            const target = +counter.getAttribute('data-target');
+            const duration = 1200; // ms
+            const stepTime = Math.abs(Math.floor(duration / (target || 1))); // prevent div by zero
+            
+            let start = 0;
+            // Use requestAnimationFrame for smoother performance on larger numbers
+            const formatter = new Intl.NumberFormat('en-US'); // Will format with commas (e.g. 15,200)
+            
+            // If target is small, slow down animation step
+            const increment = target > 100 ? Math.ceil(target / 45) : 1; 
+
+            const timer = setInterval(() => {
+                start += increment;
+                if (start >= target) {
+                    counter.innerText = formatter.format(target);
+                    clearInterval(timer);
+                } else {
+                    counter.innerText = formatter.format(start);
+                }
+            }, 25);
+        });
+    });
 
     // --- 1. DAILY CHART ---
     const dailyCtx = document.getElementById('dailyChart').getContext('2d');
