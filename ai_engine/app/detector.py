@@ -3,7 +3,7 @@ import supervision as sv
 
 class VehicleDetector:
 
-    def __init__(self, model_path="yolo11n.pt"):
+    def __init__(self, model_path="yolo11m.pt"):
         import torch
         self.model = YOLO(model_path)
         
@@ -21,7 +21,7 @@ class VehicleDetector:
 
         results = self.model(
             frame,
-            conf=0.40,
+            conf=0.25,
             verbose=False
         )[0]
 

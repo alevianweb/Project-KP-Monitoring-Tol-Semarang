@@ -1,12 +1,18 @@
 import math
+import numpy as np
 from app.database import get_connection, insert_detection
 
 class VehicleCounter:
 
     def __init__(self, camera_id, line_start_x, line_start_y, line_end_x, line_end_y):
         self.camera_id = camera_id
-        self.line_start = (line_start_x, line_start_y)
-        self.line_end = (line_end_x, line_end_y)
+        
+        # Original database coordinates (fallback)
+        self.db_line_start = (line_start_x, line_start_y)
+        self.db_line_end = (line_end_x, line_end_y)
+        
+        self.line_start = self.db_line_start
+        self.line_end = self.db_line_end
         
         self.last_position = {}
         self.counted = set()
@@ -19,16 +25,42 @@ class VehicleCounter:
         }
         self.total = 0
         
+        # Fixed optimal horizontal line (Y=300 is roughly where zebra crosses are, cars are large and stable)
+        self.is_calibrating = False
+        
+        # Custom optimal Y coordinates for each camera to avoid occlusions and cut-offs
+        # (Dihapus agar mengikuti koordinat garis miring dari database)
+        self.is_calibrating = False
+        
+        # Create a polygon buffer around the line
+        # Diatur agar sisi bawah lebih tebal/turun (buffer_bottom) daripada sisi atas
+        buffer_top = 30    # Ketebalan ke arah atas (pixel)
+        buffer_bottom = 90 # Ketebalan ke arah bawah (pixel) - dilebarkan ke bawah
+        
+        dx = self.line_end[0] - self.line_start[0]
+        dy = self.line_end[1] - self.line_start[1]
+        length = math.hypot(dx, dy)
+        
+        if length == 0:
+            nx, ny = 0, 1
+        else:
+            nx = -dy / length
+            ny = dx / length
+            
+        # Asumsi garis digambar dari kiri ke kanan (dx > 0), maka normal (nx, ny) mengarah ke BAWAH
+        p1 = (int(self.line_start[0] + nx * buffer_bottom), int(self.line_start[1] + ny * buffer_bottom))
+        p2 = (int(self.line_end[0] + nx * buffer_bottom), int(self.line_end[1] + ny * buffer_bottom))
+        p3 = (int(self.line_end[0] - nx * buffer_top), int(self.line_end[1] - ny * buffer_top))
+        p4 = (int(self.line_start[0] - nx * buffer_top), int(self.line_start[1] - ny * buffer_top))
+        
+        self.polygon = np.array([p1, p2, p3, p4], np.int32)
+        
         # Connect to DB
         self.db_conn = get_connection()
 
-    def _ccw(self, A, B, C):
-        """Check if three points are listed in a counterclockwise order"""
-        return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
-
-    def _intersect(self, A, B, C, D):
-        """Return true if line segments AB and CD intersect"""
-        return self._ccw(A, C, D) != self._ccw(B, C, D) and self._ccw(A, B, C) != self._ccw(A, B, D)
+    def _in_polygon(self, pos):
+        import cv2
+        return cv2.pointPolygonTest(self.polygon, pos, False) >= 0
 
     def update(self, tracked, class_names):
         if tracked.tracker_id is None:
@@ -42,43 +74,39 @@ class VehicleCounter:
             
             x1, y1, x2, y2 = tracked.xyxy[i]
             
-            # Bottom center of the bounding box
+            # True center of the bounding box (lebih stabil daripada bottom center)
             center_x = int((x1 + x2) / 2)
-            center_y = int(y2)
+            center_y = int((y1 + y2) / 2)
             
             current_pos = (center_x, center_y)
-
-            if track_id in self.last_position:
-                prev_pos = self.last_position[track_id]
-                
-                # Check if the line segment from prev_pos to current_pos intersects the counting line
-                if self._intersect(prev_pos, current_pos, self.line_start, self.line_end):
-                    if track_id not in self.counted:
-                        self.counted.add(track_id)
-                        
-                        # Determine direction using cross product
-                        # Vector of the line
-                        line_vec = (self.line_end[0] - self.line_start[0], self.line_end[1] - self.line_start[1])
-                        # Vector of the movement
-                        move_vec = (current_pos[0] - prev_pos[0], current_pos[1] - prev_pos[1])
-                        
-                        cross_prod = line_vec[0] * move_vec[1] - line_vec[1] * move_vec[0]
-                        direction = "Masuk" if cross_prod > 0 else "Keluar"
-                        
-                        # Update local counters
-                        if class_name in self.counts:
-                            self.counts[class_name] += 1
-                        self.total += 1
-                        
-                        # Insert into Database
-                        insert_detection(
-                            self.db_conn,
-                            self.camera_id,
-                            class_name,
-                            direction,
-                            confidence,
-                            track_id
-                        )
+            
+            # Cek apakah mobil masuk ke dalam Area Polygon
+            if self._in_polygon(current_pos):
+                if track_id not in self.counted:
+                    self.counted.add(track_id)
+                    
+                    # Determine direction
+                    if track_id in self.last_position:
+                        prev_pos = self.last_position[track_id]
+                        dy = current_pos[1] - prev_pos[1]
+                        direction = "Masuk" if dy > 0 else "Keluar"
+                    else:
+                        direction = "Masuk" # Default
+                    
+                    # Update local counters
+                    if class_name in self.counts:
+                        self.counts[class_name] += 1
+                    self.total += 1
+                    
+                    # Insert into Database
+                    insert_detection(
+                        self.db_conn,
+                        self.camera_id,
+                        class_name,
+                        direction,
+                        confidence,
+                        track_id
+                    )
 
             self.last_position[track_id] = current_pos
 

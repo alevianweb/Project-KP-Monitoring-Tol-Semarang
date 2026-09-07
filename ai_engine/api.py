@@ -67,12 +67,15 @@ def process_camera_loop(cam):
         
     cap = cv2.VideoCapture(video_path)
     tracker = VehicleTracker()
+    # Scale DB coordinates to 800x450 since frame will be resized
+    scale_x = 800 / 1920.0
+    scale_y = 450 / 1080.0
     counter = VehicleCounter(
         camera_id=cam["id"],
-        line_start_x=cam["line_start_x"],
-        line_start_y=cam["line_start_y"],
-        line_end_x=cam["line_end_x"],
-        line_end_y=cam["line_end_y"]
+        line_start_x=int(cam["line_start_x"] * scale_x),
+        line_start_y=int(cam["line_start_y"] * scale_y),
+        line_end_x=int(cam["line_end_x"] * scale_x),
+        line_end_y=int(cam["line_end_y"] * scale_y)
     )
     line_color = (0, 0, 255)
     
@@ -106,21 +109,11 @@ def process_camera_loop(cam):
             
             # SMART FRAME SKIPPING: Baca semua frame agar video mulus, 
             # tapi jalankan YOLO AI hanya setiap 2 frame untuk meringankan GPU.
+            # (Karena kita sudah pakai Polygon Area, skip frame ini sangat aman!)
             frame_count += 1
             
             frame = cv2.resize(frame, (800, 450))
-                
             h, w = frame.shape[:2]
-            scale_x = w / 1920.0
-            scale_y = h / 1080.0
-            
-            ls_x = int(cam["line_start_x"] * scale_x)
-            ls_y = int(cam["line_start_y"] * scale_y)
-            le_x = int(cam["line_end_x"] * scale_x)
-            le_y = int(cam["line_end_y"] * scale_y)
-            
-            counter.line_start = (ls_x, ls_y)
-            counter.line_end = (le_x, le_y)
 
             # Jalankan deteksi YOLO hanya di frame ganjil atau jika belum ada data
             if frame_count % 2 != 0 or last_tracked is None:
@@ -136,8 +129,9 @@ def process_camera_loop(cam):
                 tracked = last_tracked
                 results = last_results
             
-            cv2.line(frame, counter.line_start, counter.line_end, line_color, 2)
-            cv2.putText(frame, "GARIS BATAS DETEKSI", (counter.line_start[0] + 5, counter.line_start[1] - 5),
+            # Draw Polygon Area
+            cv2.polylines(frame, [counter.polygon], isClosed=True, color=line_color, thickness=2)
+            cv2.putText(frame, "AREA BATAS DETEKSI", (counter.polygon[0][0] + 5, counter.polygon[0][1] - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, line_color, 1)
             
             if tracked.tracker_id is not None:

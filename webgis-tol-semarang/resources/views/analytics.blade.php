@@ -268,7 +268,65 @@
     </form>
 </div>
 
-<!-- 1. SUMMARY STATS CARDS -->
+<!-- 1.1 SUMMARY STATS CARDS (HARI INI) -->
+<div style="margin-bottom: 1rem;">
+    <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">
+        <i class="fa-solid fa-calendar-day" style="color: var(--accent); margin-right: 0.5rem;"></i>
+        Total Volume Kendaraan Hari Ini (kend./hari)
+    </h3>
+    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; margin-left: 1.75rem;">
+        Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
+    </div>
+</div>
+<div class="summary-grid">
+    <div class="stat-card stat-card-total">
+        <div class="stat-info">
+            <span class="stat-label">Total Kendaraan</span>
+            <span class="stat-value count-up" data-target="{{ $todayTotal }}">0</span>
+        </div>
+        <div class="stat-icon icon-total">
+            <i class="fa-solid fa-gauge-high"></i>
+        </div>
+    </div>
+    <div class="stat-card stat-card-car">
+        <div class="stat-info">
+            <span class="stat-label">Mobil Pribadi</span>
+            <span class="stat-value count-up" data-target="{{ $todayCarCount }}">0</span>
+        </div>
+        <div class="stat-icon icon-car">
+            <i class="fa-solid fa-car"></i>
+        </div>
+    </div>
+    <div class="stat-card stat-card-moto">
+        <div class="stat-info">
+            <span class="stat-label">Sepeda Motor</span>
+            <span class="stat-value count-up" data-target="{{ $todayMotorcycleCount }}">0</span>
+        </div>
+        <div class="stat-icon icon-moto">
+            <i class="fa-solid fa-motorcycle"></i>
+        </div>
+    </div>
+    <div class="stat-card stat-card-bus">
+        <div class="stat-info">
+            <span class="stat-label">Bus</span>
+            <span class="stat-value count-up" data-target="{{ $todayBusCount }}">0</span>
+        </div>
+        <div class="stat-icon icon-bus">
+            <i class="fa-solid fa-bus"></i>
+        </div>
+    </div>
+    <div class="stat-card stat-card-truck">
+        <div class="stat-info">
+            <span class="stat-label">Truk</span>
+            <span class="stat-value count-up" data-target="{{ $todayTruckCount }}">0</span>
+        </div>
+        <div class="stat-icon icon-truck">
+            <i class="fa-solid fa-truck"></i>
+        </div>
+    </div>
+</div>
+
+<!-- 1.2 SUMMARY STATS CARDS (BULAN INI) -->
 <div style="margin-bottom: 1rem;">
     <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">
         <i class="fa-solid fa-calendar-check" style="color: var(--accent); margin-right: 0.5rem;"></i>
@@ -436,7 +494,7 @@
             <span>Tren Bulanan (kend./bulan)</span>
         </div>
         <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem; margin-left: 1.75rem;">
-            Tahun Ini | Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
+            3 Bulan Terakhir | Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
         </div>
         <div class="chart-box">
             <canvas id="monthlyChart"></canvas>
@@ -720,9 +778,18 @@
         }
     });
 
-    // --- AUTO REFRESH SETIAP 3 MENIT (180000 ms) ---
+    // --- AUTO REFRESH TEPAT PADA MENIT KE +3 (Di detik 00) ---
+    const now = new Date();
+    // Target = 3 menit dari sekarang, tepat di detik ke-0
+    const target = new Date(now);
+    target.setMinutes(target.getMinutes() + 3);
+    target.setSeconds(0);
+    target.setMilliseconds(0);
+
+    const msUntilTarget = target.getTime() - now.getTime();
+
     setTimeout(() => {
         window.location.reload();
-    }, 180000);
+    }, msUntilTarget);
 </script>
 @endsection

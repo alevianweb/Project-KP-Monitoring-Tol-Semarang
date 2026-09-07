@@ -50,6 +50,22 @@ class AnalyticsController extends Controller
         $truckCount = $statsSummary->truck ?? 0;
         $totalCount = $statsSummary->total ?? 0;
 
+        // --- 1.1 OVERALL TOTALS (Today) ---
+        $todayDate = Carbon::today();
+        $todayStatsSummary = (clone $dailyQuery)
+            ->where('statistic_date', $todayDate)
+            ->select(
+                DB::raw('SUM(motorcycle) as motorcycle'),
+                DB::raw('SUM(car) as car'),
+                DB::raw('SUM(bus) as bus'),
+                DB::raw('SUM(truck) as truck')
+            )->first();
+            
+        $todayMotorcycleCount = $todayStatsSummary->motorcycle ?? 0;
+        $todayCarCount = $todayStatsSummary->car ?? 0;
+        $todayBusCount = $todayStatsSummary->bus ?? 0;
+        $todayTruckCount = $todayStatsSummary->truck ?? 0;
+
         // --- 2. AUTOMATIC TREND INDICATORS ---
         // Today vs Yesterday
         $today = Carbon::today();
@@ -137,18 +153,20 @@ class AnalyticsController extends Controller
             $weeklyTrucks[] = $row->truck;
         }
 
-        // Monthly Chart (All Months in Current Year)
+        // Monthly Chart (Latest 3 Months)
         $monthlyChartData = (clone $monthlyQuery)
-            ->where('year', $currentYear)
-            ->select('month',
+            ->select('year', 'month',
                 DB::raw('SUM(car) as car'),
                 DB::raw('SUM(motorcycle) as motorcycle'),
                 DB::raw('SUM(bus) as bus'),
                 DB::raw('SUM(truck) as truck')
             )
-            ->groupBy('month')
-            ->orderBy('month', 'asc')
-            ->get();
+            ->groupBy('year', 'month')
+            ->orderBy('year', 'desc')
+            ->orderBy('month', 'desc')
+            ->limit(3)
+            ->get()
+            ->reverse();
 
         $monthNames = [
             1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'Mei', 6 => 'Jun',
@@ -176,6 +194,10 @@ class AnalyticsController extends Controller
             'busCount',
             'truckCount',
             'totalCount',
+            'todayMotorcycleCount',
+            'todayCarCount',
+            'todayBusCount',
+            'todayTruckCount',
             'todayTotal',
             'yesterdayTotal',
             'dailyGrowth',
