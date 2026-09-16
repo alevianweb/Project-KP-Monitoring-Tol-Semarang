@@ -272,7 +272,7 @@
 <div style="margin-bottom: 1rem;">
     <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">
         <i class="fa-solid fa-calendar-day" style="color: var(--accent); margin-right: 0.5rem;"></i>
-        Total Volume Kendaraan Hari Ini (kend./hari)
+        Data Hari Ini (kend./hari)
     </h3>
     <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; margin-left: 1.75rem;">
         Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
@@ -330,7 +330,7 @@
 <div style="margin-bottom: 1rem;">
     <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">
         <i class="fa-solid fa-calendar-check" style="color: var(--accent); margin-right: 0.5rem;"></i>
-        Total Volume Kendaraan Bulan Ini (kend./bulan)
+        Data Bulan Ini (kend./bulan)
     </h3>
     <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; margin-left: 1.75rem;">
         Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
@@ -479,8 +479,24 @@
             <i class="fa-solid fa-chart-area"></i>
             <span>Tren Lalu Lintas Harian (kend./hari)</span>
         </div>
-        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem; margin-left: 1.75rem;">
-            15 Hari Terakhir | Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem; margin-left: 1.75rem; margin-right: 1.75rem;">
+            <span>
+                @if($page == 1)
+                    15 Hari Terakhir
+                @else
+                    Hari {{ ($page - 1) * 15 + 1 }} - {{ $page * 15 }} Terakhir
+                @endif
+                | Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
+            </span>
+            <div style="display: flex; gap: 0.5rem;">
+                <!-- Mundur ke masa lalu (page + 1), panah kiri -->
+                <a href="{{ request()->fullUrlWithQuery(['page' => $page + 1]) }}" style="padding: 0.2rem 0.6rem; border: 1px solid var(--card-border); border-radius: 4px; text-decoration: none; color: var(--text-primary); transition: background 0.2s;"><i class="fa-solid fa-chevron-left"></i> Mundur</a>
+                
+                <!-- Maju ke masa sekarang (page - 1), panah kanan -->
+                @if($page > 1)
+                    <a href="{{ request()->fullUrlWithQuery(['page' => $page - 1]) }}" style="padding: 0.2rem 0.6rem; border: 1px solid var(--card-border); border-radius: 4px; text-decoration: none; color: var(--text-primary); transition: background 0.2s;">Maju <i class="fa-solid fa-chevron-right"></i></a>
+                @endif
+            </div>
         </div>
         <div class="chart-box">
             <canvas id="dailyChart"></canvas>
@@ -610,6 +626,24 @@
                     tension: 0.3,
                     borderWidth: 1.5,
                     pointRadius: 2,
+                },
+                {
+                    label: 'Bus',
+                    data: dailyBuses.length ? dailyBuses : [0],
+                    borderColor: '#8b5cf6',
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 2,
+                },
+                {
+                    label: 'Truk',
+                    data: dailyTrucks.length ? dailyTrucks : [0],
+                    borderColor: '#ef4444',
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 2,
                 }
             ]
         },
@@ -634,6 +668,8 @@
     const monthlyMotos = @json($monthlyMotos);
     const monthlyBuses = @json($monthlyBuses);
     const monthlyTrucks = @json($monthlyTrucks);
+    
+    const monthlyTotals = monthlyCars.length ? monthlyCars.map((val, idx) => val + monthlyMotos[idx] + monthlyBuses[idx] + monthlyTrucks[idx]) : [0];
 
     new Chart(monthlyCtx, {
         type: 'bar',
@@ -641,21 +677,9 @@
             labels: monthlyLabels.length ? monthlyLabels : ['Jan', 'Feb', 'Mar', 'Apr', 'Mei'],
             datasets: [
                 {
-                    label: 'Mobil',
-                    data: monthlyCars.length ? monthlyCars : [0, 0, 0, 0, 0],
-                    backgroundColor: '#10b981',
-                    borderRadius: 4
-                },
-                {
-                    label: 'Motor',
-                    data: monthlyMotos.length ? monthlyMotos : [0, 0, 0, 0, 0],
-                    backgroundColor: '#f59e0b',
-                    borderRadius: 4
-                },
-                {
-                    label: 'Bus/Truk',
-                    data: monthlyCars.length ? monthlyCars.map((val, idx) => (monthlyBuses[idx] || 0) + (monthlyTrucks[idx] || 0)) : [0, 0, 0, 0, 0],
-                    backgroundColor: '#ef4444',
+                    label: 'Total Kendaraan',
+                    data: monthlyTotals,
+                    backgroundColor: '#3b82f6',
                     borderRadius: 4
                 }
             ]
@@ -667,8 +691,8 @@
                 legend: { position: 'top', labels: { boxWidth: 12 } }
             },
             scales: {
-                y: { stacked: true, beginAtZero: true },
-                x: { stacked: true, grid: { display: false } }
+                y: { beginAtZero: true },
+                x: { grid: { display: false } }
             }
         }
     });
@@ -681,43 +705,59 @@
     const weeklyMotos = @json($weeklyMotos);
     const weeklyBuses = @json($weeklyBuses);
     const weeklyTrucks = @json($weeklyTrucks);
+    
+    const weeklyTotals = weeklyCars.length ? weeklyCars.map((val, idx) => val + weeklyMotos[idx] + weeklyBuses[idx] + weeklyTrucks[idx]) : [0];
 
     new Chart(weeklyCtx, {
-        type: 'bar',
+        type: 'line',
         data: {
             labels: weeklyLabels.length ? weeklyLabels : ['Minggu 1', 'Minggu 2', 'Minggu 3'],
             datasets: [
                 {
+                    label: 'Total Kendaraan',
+                    data: weeklyTotals,
+                    borderColor: '#3b82f6',
+                    backgroundColor: blueGradient,
+                    fill: true,
+                    tension: 0.35,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#3b82f6',
+                },
+                {
                     label: 'Mobil',
                     data: weeklyCars.length ? weeklyCars : [0],
-                    backgroundColor: 'rgba(16, 185, 129, 0.85)',
                     borderColor: '#10b981',
-                    borderWidth: 1,
-                    borderRadius: 6
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 2,
                 },
                 {
                     label: 'Motor',
                     data: weeklyMotos.length ? weeklyMotos : [0],
-                    backgroundColor: 'rgba(245, 158, 11, 0.85)',
                     borderColor: '#f59e0b',
-                    borderWidth: 1,
-                    borderRadius: 6
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 2,
                 },
                 {
                     label: 'Bus',
                     data: weeklyBuses.length ? weeklyBuses : [0],
-                    backgroundColor: 'rgba(139, 92, 246, 0.85)',
                     borderColor: '#8b5cf6',
-                    borderWidth: 1,
-                    borderRadius: 6
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 2,
                 },
                 {
                     label: 'Truk',
                     data: weeklyTrucks.length ? weeklyTrucks : [0],
-                    backgroundColor: 'rgba(239, 68, 68, 0.85)',
                     borderColor: '#ef4444',
-                    borderWidth: 1,
-                    borderRadius: 6
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 2,
                 }
             ]
         },

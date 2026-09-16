@@ -1,0 +1,8 @@
+Mengaktifkan API-VENV (CMD)
+cd C:\laragon\www\Project_KP\ai_engine
+venv\Scripts\activate.bat
+uvicorn api:app --reload --port 8001
+
+Menjalankan LARAVEL (PS)
+cd webgis-tol-semarang
+php artisan serve

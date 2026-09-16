@@ -8,23 +8,59 @@ def generate_dummy_data():
     conn.autocommit = True
     cur = conn.cursor()
     
-    print("Mulai membuat data dummy historis...")
+    print("Mulai membuat data dummy historis yang realistis...")
+    
+    # Truncate tables to start clean
+    try:
+        cur.execute("TRUNCATE vehicle_statistics_daily, vehicle_statistics_weekly, vehicle_statistics_monthly RESTART IDENTITY;")
+        print("Tabel statistik berhasil dikosongkan.")
+    except Exception as e:
+        print(f"Gagal truncate tabel: {e}")
     
     # Ambil semua camera
     cur.execute("SELECT id FROM cameras;")
     cameras = [row[0] for row in cur.fetchall()]
     
-    # Generate untuk 30 hari ke belakang
-    today = datetime.now()
+    today = datetime(2026, 9, 8).date()
     
     for cam_id in cameras:
-        for i in range(30, 0, -1):
+        # Generate for 75 days back (end of June to early Sep)
+        for i in range(75, -1, -1):
             date_obj = today - timedelta(days=i)
-            # Acak jumlah kendaraan
-            car = random.randint(150, 400)
-            motor = random.randint(100, 300)
-            bus = random.randint(10, 50)
-            truck = random.randint(20, 80)
+            
+            base_car = random.randint(1512, 2589)
+            base_motor = random.randint(1043, 2011)
+            base_bus = random.randint(102, 305)
+            base_truck = random.randint(207, 508)
+            
+            # Month specific adjustments
+            if date_obj.month == 7:
+                multiplier = 1.15
+            elif date_obj.month == 8:
+                if date_obj.day == 2:
+                    multiplier = 2.0
+                elif 14 <= date_obj.day <= 16:
+                    multiplier = 2.5
+                elif 20 <= date_obj.day <= 23:
+                    multiplier = 3.0
+                else:
+                    multiplier = 1.0
+            elif date_obj.month == 9:
+                multiplier = 1.5
+            else:
+                multiplier = 1.0
+
+            car = int(base_car * multiplier)
+            motor = int(base_motor * multiplier)
+            bus = int(base_bus * multiplier)
+            truck = int(base_truck * multiplier)
+            
+            # Random jitter +/- 10%
+            car = random.randint(int(car * 0.9), int(car * 1.1))
+            motor = random.randint(int(motor * 0.9), int(motor * 1.1))
+            bus = random.randint(int(bus * 0.9), int(bus * 1.1))
+            truck = random.randint(int(truck * 0.9), int(truck * 1.1))
+            
             total = car + motor + bus + truck
             
             # Daily
@@ -32,7 +68,7 @@ def generate_dummy_data():
                 INSERT INTO vehicle_statistics_daily (camera_id, statistic_date, motorcycle, car, bus, truck, total)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (camera_id, statistic_date) DO NOTHING;
-            """, (cam_id, date_obj.date(), motor, car, bus, truck, total))
+            """, (cam_id, date_obj, motor, car, bus, truck, total))
             
             # Weekly
             week = date_obj.isocalendar()[1]
@@ -61,7 +97,7 @@ def generate_dummy_data():
                 total = vehicle_statistics_monthly.total + EXCLUDED.total;
             """, (cam_id, month, year, motor, car, bus, truck, total))
 
-    print("Selesai! Data historis (dummy) berhasil ditambahkan.")
+    print("Selesai! Data historis (dummy) berhasil ditambahkan sesuai analisis spasial.")
     cur.close()
     conn.close()
 

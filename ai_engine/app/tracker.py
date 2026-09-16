@@ -6,7 +6,8 @@ class VehicleTracker:
     def __init__(self):
 
         self.tracker = sv.ByteTrack(
-            track_activation_threshold=0.25
+            track_activation_threshold=0.25,
+            lost_track_buffer=90
         )
 
     def update(self, detections):

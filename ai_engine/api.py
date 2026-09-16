@@ -96,6 +96,11 @@ def process_camera_loop(cam):
         last_tracked = None
         last_results = None
         
+        # FPS variables
+        fps_start_time = time.time()
+        fps_counter = 0
+        current_fps = 0.0
+        
         while running:
             if not cap.isOpened():
                 time.sleep(1)
@@ -111,6 +116,13 @@ def process_camera_loop(cam):
             # tapi jalankan YOLO AI hanya setiap 2 frame untuk meringankan GPU.
             # (Karena kita sudah pakai Polygon Area, skip frame ini sangat aman!)
             frame_count += 1
+            fps_counter += 1
+            
+            # Hitung FPS setiap detik
+            if time.time() - fps_start_time >= 1.0:
+                current_fps = fps_counter / (time.time() - fps_start_time)
+                fps_counter = 0
+                fps_start_time = time.time()
             
             frame = cv2.resize(frame, (800, 450))
             h, w = frame.shape[:2]

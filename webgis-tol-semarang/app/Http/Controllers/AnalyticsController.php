@@ -15,6 +15,7 @@ class AnalyticsController extends Controller
     public function index(Request $request)
     {
         $cameraId = $request->input('camera_id');
+        $page = (int) $request->input('page', 1);
         $cameras = Camera::all();
 
         // Base query scopes
@@ -98,7 +99,10 @@ class AnalyticsController extends Controller
         $monthlyGrowth = $lastMonthTotal > 0 ? (($thisMonthTotal - $lastMonthTotal) / $lastMonthTotal) * 100 : 0;
 
         // --- 3. CHART DATA ---
-        // Daily Chart (Last 15 Days)
+        // Daily Chart (Last 15 Days with Pagination)
+        $perPage = 15;
+        $offset = ($page - 1) * $perPage;
+
         $dailyChartData = (clone $dailyQuery)
             ->select('statistic_date', 
                 DB::raw('SUM(car) as car'),
@@ -108,7 +112,8 @@ class AnalyticsController extends Controller
             )
             ->groupBy('statistic_date')
             ->orderBy('statistic_date', 'desc')
-            ->limit(15)
+            ->offset($offset)
+            ->limit($perPage)
             ->get()
             ->reverse();
 
@@ -118,7 +123,8 @@ class AnalyticsController extends Controller
         $dailyBuses = [];
         $dailyTrucks = [];
         foreach ($dailyChartData as $row) {
-            $dailyLabels[] = Carbon::parse($row->statistic_date)->format('d M');
+            $date = Carbon::parse($row->statistic_date)->locale('id');
+            $dailyLabels[] = [$date->isoFormat('dddd'), $date->format('d M')];
             $dailyCars[] = $row->car;
             $dailyMotos[] = $row->motorcycle;
             $dailyBuses[] = $row->bus;
@@ -146,7 +152,16 @@ class AnalyticsController extends Controller
         $weeklyBuses = [];
         $weeklyTrucks = [];
         foreach ($weeklyChartData as $row) {
-            $weeklyLabels[] = "Minggu " . $row->week . " (" . $row->year . ")";
+            $weekStart = Carbon::now()->setISODate($row->year, $row->week)->startOfWeek();
+            $weekEnd = Carbon::now()->setISODate($row->year, $row->week)->endOfWeek();
+
+            if ($weekStart->month == $weekEnd->month) {
+                $dateRange = $weekStart->format('j') . ' - ' . $weekEnd->locale('id')->format('j M');
+            } else {
+                $dateRange = $weekStart->locale('id')->format('j M') . ' - ' . $weekEnd->locale('id')->format('j M');
+            }
+
+            $weeklyLabels[] = ["Minggu " . $row->week, $dateRange];
             $weeklyCars[] = $row->car;
             $weeklyMotos[] = $row->motorcycle;
             $weeklyBuses[] = $row->bus;
@@ -189,6 +204,7 @@ class AnalyticsController extends Controller
         return view('analytics', compact(
             'cameras',
             'cameraId',
+            'page',
             'motorcycleCount',
             'carCount',
             'busCount',
