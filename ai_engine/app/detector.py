@@ -21,7 +21,7 @@ class VehicleDetector:
 
         results = self.model(
             frame,
-            conf=0.25,
+            conf=0.30,
             verbose=False
         )[0]
 

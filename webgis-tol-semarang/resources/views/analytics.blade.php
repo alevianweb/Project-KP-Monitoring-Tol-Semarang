@@ -59,6 +59,88 @@
         margin-bottom: 2rem;
     }
 
+    /* Header Data Kendaraan dengan Toggle Pilihan */
+    .data-kendaraan-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .data-kendaraan-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+    }
+
+    .data-kendaraan-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    /* Segmented Control / Pill Switcher */
+    .period-toggle-group {
+        display: inline-flex;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        padding: 4px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        gap: 4px;
+    }
+
+    .period-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 1.1rem;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        font-family: inherit;
+    }
+
+    .period-toggle-btn:hover {
+        color: var(--text-primary);
+        background: rgba(125, 125, 125, 0.08);
+    }
+
+    .period-toggle-btn.active {
+        background: var(--accent);
+        color: #ffffff;
+        box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    .summary-grid.fade-in-tab {
+        animation: tabFadeIn 0.3s ease-out;
+    }
+
+    @keyframes tabFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
     .stat-card {
         background: var(--card-bg);
         border: 1px solid var(--card-border);
@@ -268,17 +350,32 @@
     </form>
 </div>
 
-<!-- 1.1 SUMMARY STATS CARDS (HARI INI) -->
-<div style="margin-bottom: 1rem;">
-    <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">
-        <i class="fa-solid fa-calendar-day" style="color: var(--accent); margin-right: 0.5rem;"></i>
-        Data Hari Ini (kend./hari)
-    </h3>
-    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; margin-left: 1.75rem;">
-        Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
+<!-- DATA KENDARAAN (DENGAN PILIHAN HARIAN / BULANAN) -->
+<div class="data-kendaraan-header">
+    <div>
+        <h3 class="data-kendaraan-title">
+            <i class="fa-solid fa-road" style="color: var(--accent);"></i>
+            Data Kendaraan
+        </h3>
+        <div id="data-kendaraan-subtitle" class="data-kendaraan-subtitle">
+            <i class="fa-solid fa-calendar-day" style="color: var(--accent);"></i>
+            <span>Data Hari Ini (kend./hari) | Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB</span>
+        </div>
+    </div>
+    
+    <!-- Pilihan Tampilan Periode: Harian vs Bulanan -->
+    <div class="period-toggle-group" role="tablist">
+        <button type="button" class="period-toggle-btn active" id="btn-period-daily" onclick="switchVehiclePeriod('daily')">
+            <i class="fa-solid fa-calendar-day"></i> Harian (Hari Ini)
+        </button>
+        <button type="button" class="period-toggle-btn" id="btn-period-monthly" onclick="switchVehiclePeriod('monthly')">
+            <i class="fa-solid fa-calendar-days"></i> Bulanan (Bulan Ini)
+        </button>
     </div>
 </div>
-<div class="summary-grid">
+
+<!-- 1. GRID DATA HARI INI -->
+<div id="grid-period-daily" class="summary-grid fade-in-tab">
     <div class="stat-card stat-card-total">
         <div class="stat-info">
             <span class="stat-label">Total Kendaraan</span>
@@ -326,17 +423,8 @@
     </div>
 </div>
 
-<!-- 1.2 SUMMARY STATS CARDS (BULAN INI) -->
-<div style="margin-bottom: 1rem;">
-    <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-primary);">
-        <i class="fa-solid fa-calendar-check" style="color: var(--accent); margin-right: 0.5rem;"></i>
-        Data Bulan Ini (kend./bulan)
-    </h3>
-    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem; margin-left: 1.75rem;">
-        Diupdate: {{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB
-    </div>
-</div>
-<div class="summary-grid">
+<!-- 2. GRID DATA BULAN INI -->
+<div id="grid-period-monthly" class="summary-grid fade-in-tab" style="display: none;">
     <div class="stat-card stat-card-total">
         <div class="stat-info">
             <span class="stat-label">Total Kendaraan</span>
@@ -549,7 +637,57 @@
     }
     updateChartDefaults();
 
-    // --- COUNT UP ANIMATION ---
+    // --- SWITCH VEHICLE DATA PERIOD (HARIAN / BULANAN) ---
+    function switchVehiclePeriod(period) {
+        const dailyGrid = document.getElementById('grid-period-daily');
+        const monthlyGrid = document.getElementById('grid-period-monthly');
+        const btnDaily = document.getElementById('btn-period-daily');
+        const btnMonthly = document.getElementById('btn-period-monthly');
+        const subtitle = document.getElementById('data-kendaraan-subtitle');
+        const timeStr = "{{ \Carbon\Carbon::now('Asia/Jakarta')->format('H:i') }} WIB";
+
+        if (period === 'daily') {
+            dailyGrid.style.display = 'grid';
+            monthlyGrid.style.display = 'none';
+            btnDaily.classList.add('active');
+            btnMonthly.classList.remove('active');
+            subtitle.innerHTML = `<i class="fa-solid fa-calendar-day" style="color: var(--accent);"></i> <span>Data Hari Ini (kend./hari) | Diupdate: ${timeStr}</span>`;
+            animateCountersInGrid(dailyGrid);
+        } else {
+            dailyGrid.style.display = 'none';
+            monthlyGrid.style.display = 'grid';
+            btnDaily.classList.remove('active');
+            btnMonthly.classList.add('active');
+            subtitle.innerHTML = `<i class="fa-solid fa-calendar-check" style="color: var(--accent);"></i> <span>Data Bulan Ini (kend./bulan) | Diupdate: ${timeStr}</span>`;
+            animateCountersInGrid(monthlyGrid);
+        }
+    }
+
+    function animateCountersInGrid(gridElement) {
+        if (!gridElement) return;
+        const counters = gridElement.querySelectorAll('.count-up');
+        const formatter = new Intl.NumberFormat('en-US');
+        counters.forEach(counter => {
+            const target = +counter.getAttribute('data-target') || 0;
+            if (target === 0) {
+                counter.innerText = "0";
+                return;
+            }
+            let start = 0;
+            const increment = target > 100 ? Math.ceil(target / 45) : 1;
+            const timer = setInterval(() => {
+                start += increment;
+                if (start >= target) {
+                    counter.innerText = formatter.format(target);
+                    clearInterval(timer);
+                } else {
+                    counter.innerText = formatter.format(start);
+                }
+            }, 25);
+        });
+    }
+
+    // --- COUNT UP ANIMATION HELPER ---
     document.addEventListener("DOMContentLoaded", () => {
         const counters = document.querySelectorAll('.count-up');
         
